@@ -1,0 +1,29 @@
+# Python
+sleepnet/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# NeuralBench data (never commit these — hundreds of GB)
+data/
+cache/
+saves/
+*.ckpt
+*.pt
+*.pth
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Environment
+.env
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+.env
