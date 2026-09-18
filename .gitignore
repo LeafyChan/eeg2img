@@ -29,6 +29,6 @@ Thumbs.db
 .env
 
 # Local planning docs
-learning.md
-prd.md
-tasks.md
+.docs/learning.md
+.docs/prd.md
+.docs/tasks.md
