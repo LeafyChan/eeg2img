@@ -27,3 +27,8 @@ saves/
 .DS_Store
 Thumbs.db
 .env
+
+# Local planning docs
+learning.md
+prd.md
+tasks.md
