@@ -6,16 +6,21 @@ from neuralbench import check_model, evaluate_model
 
 model = SleepNetEncoder()
 
-print("=== Shape check ===")
+# Print layer names so we know what to pass
+print("=== Layer names ===")
+for name, _ in model.named_children():
+    print(f"  {name}")
+
+print("\n=== Shape check ===")
 print(check_model(model, "eeg", "sleep_onset"))
 
-print("\n=== Running evaluation ===")
+print("\n=== Running evaluation (all layers unfrozen) ===")
 scores = evaluate_model(
     model,
     "eeg",
     "sleep_onset",
-    name="sleepnet-v1",
+    name="sleepnet-v1-fulltune",
     dataset="alvarez2022haaglanden",
-    debug=False
+    overrides={"downstream_model_wrapper.layers_to_unfreeze": ["projections", "temporal"]}
 )
 print(scores)
