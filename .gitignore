@@ -1,0 +1,10 @@
+data/
+cache/
+outputs/
+logs/
+submissions/
+*.out
+*.err
+__pycache__/
+*.pyc
+.env
