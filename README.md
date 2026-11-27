@@ -12,3 +12,4 @@ Final sealed-phase submission: 2-member REVE-base ensemble (63rd of 1,753 submis
 
 Data is not included (Alljoined-1.6M is licensed non-commercial).
 Track 3 (sleep) work lives in track3_sleepnet/.
+Note: submission/DO_NOT_UPLOAD_* is code for a model trained on THINGS-EEG2 test recordings (warm-up only, never part of a sealed submission).
