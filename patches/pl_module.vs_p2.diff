@@ -1,0 +1,79 @@
+--- /path/to/home/miniconda3/envs/eeg2img_new/lib/python3.12/site-packages/neuralbench/pl_module.py.bak_p2	2026-11-19 10:25:37.294281004 +0530
++++ /path/to/home/miniconda3/envs/eeg2img_new/lib/python3.12/site-packages/neuralbench/pl_module.py	2026-11-21 20:05:30.426996701 +0530
+@@ -228,7 +228,8 @@
+             # Every frame unlabelled: a zero still attached to the graph.
+             loss = loss_pred.sum()
+         else:
+-            loss = self._bank_loss(loss_pred, loss_true, step_name)
++            loss = self._p2_or_bank(loss_pred, loss_true, step_name)
++            loss = self._aux_add(loss, loss_true, step_name)
+ 
+         # A loss may return a dict of named components with a ``"total"``
+         # key (e.g. multi-term objectives); CTC and plain losses return a
+@@ -319,6 +320,66 @@
+             out = (out + out_c) / 2
+         return out
+ 
++    def _p2_or_bank(self, pred, true, step_name):
++        import os
++        G = int(os.environ.get("NB_GROUP", "0") or 0)
++        if (G < 1 or step_name != "train" or not hasattr(self.loss, "get_scores")
++                or true.ndim != 2 or pred.shape != true.shape):
++            return self._bank_loss(pred, true, step_name)
++        from neuralbench.p2 import p2_loss
++        if not getattr(self, "_p2_said", False):
++            print(f"[P2] loss ON G={G} lambda={os.environ.get('NB_LAMBDA','1.0')} group_loss={os.environ.get('NB_GROUP_LOSS','1')}", flush=True)
++            self._p2_said = True
++        return p2_loss(self.loss, pred, true, G, float(os.environ.get("NB_LAMBDA", "1.0")),
++                       group_on=os.environ.get("NB_GROUP_LOSS", "1") == "1")
++
++    def _aux_add(self, loss, true, step_name):
++        import os
++        if (os.environ.get("NB_AUX") != "1" or step_name != "train"
++                or not hasattr(self.model, "aux_head") or isinstance(loss, dict)):
++            return loss
++        import numpy as np
++        import torch
++        import torch.nn.functional as F
++        dev = true.device
++        if getattr(self, "_aux_tab", None) is None:
++            z = np.load(os.environ["NB_AUX_NPZ"])
++            names = os.environ.get("NB_AUX_LAYERS", "L20,L24,L28,L32,L36").split(",")
++            self._aux_cands = {k: F.normalize(torch.tensor(z[k].astype("float32")), dim=1)
++                               for k in z.files if k.startswith("L")}
++            tabs = []
++            for k in names:
++                a = torch.tensor(z[k].astype("float32"))
++                tabs.append((a - a.mean(0)) / (a.std(0) + 1e-6))
++            self._aux_tab = torch.stack(tabs, 1).to(dev)
++            self._aux_key = os.environ.get("NB_AUX_MATCH", "L26")
++            self._aux_n = 0
++        tn = F.normalize(true.detach().float(), dim=1)
++        if self._aux_n == 0:
++            MG = float(os.environ.get("NB_AUX_MARGIN", "0.02")); tc = tn.cpu(); st = {}
++            for k, v in self._aux_cands.items():
++                t2 = (tc @ v.T).topk(2, dim=1).values
++                m = t2[:, 0]; g = t2[:, 0] - t2[:, 1]
++                st[k] = (round(m.mean().item(), 4), round(m.min().item(), 4), round((g > MG).float().mean().item(), 3), round(g.median().item(), 4))
++            print("[NB_AUX] match (mean cos, min cos, frac margin>MG, median margin):", st, flush=True)
++            best = max(st, key=lambda k: (st[k][2], st[k][0]))
++            self._aux_key = os.environ.get("NB_AUX_MATCH") or best
++            assert st[self._aux_key][2] >= 0.9, f"NB_AUX: no layer matches: {st}"
++            self._aux_cands = {self._aux_key: self._aux_cands[self._aux_key].to(dev)}
++            print("[NB_AUX] using", self._aux_key, flush=True)
++        t2v, t2i = (tn @ self._aux_cands[self._aux_key].T).topk(2, dim=1)
++        idx = t2i[:, 0]
++        ok = ((t2v[:, 0] - t2v[:, 1]) > float(os.environ.get("NB_AUX_MARGIN", "0.02"))).float()
++        emb = self.model._last_emb
++        K = self._aux_tab.shape[1]
++        pred = self.model.aux_head(emb).view(len(emb), K, -1)
++        cs = F.cosine_similarity(pred, self._aux_tab[idx], dim=-1).mean(1)
++        la = ((1 - cs) * ok).sum() / ok.sum().clamp(min=1.0)
++        self._aux_n += 1
++        if self._aux_n % 500 == 1:
++            print(f"[NB_AUX] step {self._aux_n} aux {la.item():.4f} main {loss.item():.4f} ok {ok.mean().item():.3f}", flush=True)
++        return loss + float(os.environ.get("NB_AUX_LAMBDA", "1.0")) * la
++
+     def training_step(self, batch: Batch, batch_idx: int):
+         loss, _, _ = self._run_step(batch, step_name="train", batch_idx=batch_idx)
+         return loss

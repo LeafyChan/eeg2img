@@ -1,0 +1,22 @@
+--- /path/to/home/miniconda3/envs/eeg2img_new/lib/python3.12/site-packages/neuralbench/modules.py.bak_aux	2026-11-21 18:37:36.087750182 +0530
++++ /path/to/home/miniconda3/envs/eeg2img_new/lib/python3.12/site-packages/neuralbench/modules.py	2026-11-21 18:37:36.091750259 +0530
+@@ -813,6 +813,11 @@
+         self._build_probe(
+             probe_config, n_inputs, wrapper_n_outputs, brain_model_output_size
+         )
++        import os as _os
++        if _os.environ.get("NB_AUX") == "1":
++            _k = len(_os.environ.get("NB_AUX_LAYERS", "L20,L24,L28,L32,L36").split(","))
++            self.aux_head = nn.Linear(n_inputs, 1536 * _k)
++            print(f"[NB_AUX] aux head {n_inputs} -> {_k} x 1536", flush=True)
+ 
+         # The hook lives on ``self.wrapped_model`` (a submodule of ``self``), so
+         # a strong closure over ``self`` would form a self -> wrapped_model ->
+@@ -998,6 +1003,7 @@
+         if self.model_output_key is not None:
+             out = out[self.model_output_key]
+         out = self.aggregation(out)
++        self._last_emb = out
+         if return_embedding:
+             return out
+         out = self.probe(out)

@@ -1,0 +1,10 @@
+{
+  "USER": "USER",
+  "ENTITY_NAME": "USER",
+  "PROJECT_NAME": "eeg2img",
+  "DATA_DIR": "/path/to/home/eeg2img_new/data",
+  "CACHE_DIR": "/path/to/home/eeg2img_new/cache",
+  "SAVE_DIR": "/path/to/home/eeg2img_new/outputs",
+  "SLURM_PARTITION": "gpu_student",
+  "MEM_GB": 60
+}

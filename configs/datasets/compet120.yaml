@@ -1,0 +1,8 @@
+data:
+  neuro:
+    frequency: 200.0
+    filter: [0.1, 55.0]
+    notch_filter: [50.0, 60.0]
+    baseline: [0.0, 0.2]
+    scaler: RobustScaler
+    clamp: 20.0

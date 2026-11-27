@@ -1,0 +1,50 @@
+--- /path/to/home/miniconda3/envs/eeg2img_new/lib/python3.12/site-packages/neuralbench/pl_module.py.bak_aux2	2026-11-21 20:02:01.147068157 +0530
++++ /path/to/home/miniconda3/envs/eeg2img_new/lib/python3.12/site-packages/neuralbench/pl_module.py	2026-11-21 20:05:30.426996701 +0530
+@@ -345,8 +345,8 @@
+         if getattr(self, "_aux_tab", None) is None:
+             z = np.load(os.environ["NB_AUX_NPZ"])
+             names = os.environ.get("NB_AUX_LAYERS", "L20,L24,L28,L32,L36").split(",")
+-            self._aux_cands = {k: F.normalize(torch.tensor(z[k].astype("float32")), dim=1).to(dev)
+-                               for k in ("L26", "L27")}
++            self._aux_cands = {k: F.normalize(torch.tensor(z[k].astype("float32")), dim=1)
++                               for k in z.files if k.startswith("L")}
+             tabs = []
+             for k in names:
+                 a = torch.tensor(z[k].astype("float32"))
+@@ -355,19 +355,29 @@
+             self._aux_key = os.environ.get("NB_AUX_MATCH", "L26")
+             self._aux_n = 0
+         tn = F.normalize(true.detach().float(), dim=1)
+-        mx, idx = (tn @ self._aux_cands[self._aux_key].T).max(1)
+         if self._aux_n == 0:
+-            st = {k: (round((tn @ v.T).max(1).values.mean().item(), 4),
+-                      round((tn @ v.T).max(1).values.min().item(), 4)) for k, v in self._aux_cands.items()}
+-            print("[NB_AUX] match cos (mean, min):", st, flush=True)
+-            assert mx.min().item() > 0.98, f"NB_AUX: targets do not match {self._aux_key} (min cos {mx.min().item():.3f})"
++            MG = float(os.environ.get("NB_AUX_MARGIN", "0.02")); tc = tn.cpu(); st = {}
++            for k, v in self._aux_cands.items():
++                t2 = (tc @ v.T).topk(2, dim=1).values
++                m = t2[:, 0]; g = t2[:, 0] - t2[:, 1]
++                st[k] = (round(m.mean().item(), 4), round(m.min().item(), 4), round((g > MG).float().mean().item(), 3), round(g.median().item(), 4))
++            print("[NB_AUX] match (mean cos, min cos, frac margin>MG, median margin):", st, flush=True)
++            best = max(st, key=lambda k: (st[k][2], st[k][0]))
++            self._aux_key = os.environ.get("NB_AUX_MATCH") or best
++            assert st[self._aux_key][2] >= 0.9, f"NB_AUX: no layer matches: {st}"
++            self._aux_cands = {self._aux_key: self._aux_cands[self._aux_key].to(dev)}
++            print("[NB_AUX] using", self._aux_key, flush=True)
++        t2v, t2i = (tn @ self._aux_cands[self._aux_key].T).topk(2, dim=1)
++        idx = t2i[:, 0]
++        ok = ((t2v[:, 0] - t2v[:, 1]) > float(os.environ.get("NB_AUX_MARGIN", "0.02"))).float()
+         emb = self.model._last_emb
+         K = self._aux_tab.shape[1]
+         pred = self.model.aux_head(emb).view(len(emb), K, -1)
+-        la = (1 - F.cosine_similarity(pred, self._aux_tab[idx], dim=-1)).mean()
++        cs = F.cosine_similarity(pred, self._aux_tab[idx], dim=-1).mean(1)
++        la = ((1 - cs) * ok).sum() / ok.sum().clamp(min=1.0)
+         self._aux_n += 1
+         if self._aux_n % 500 == 1:
+-            print(f"[NB_AUX] step {self._aux_n} aux {la.item():.4f} main {loss.item():.4f}", flush=True)
++            print(f"[NB_AUX] step {self._aux_n} aux {la.item():.4f} main {loss.item():.4f} ok {ok.mean().item():.3f}", flush=True)
+         return loss + float(os.environ.get("NB_AUX_LAMBDA", "1.0")) * la
+ 
+     def training_step(self, batch: Batch, batch_idx: int):

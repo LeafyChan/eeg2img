@@ -1,0 +1,41 @@
+data:
+  study:
+    =replace=: true
+    source:
+      name: Xu2025Alljoined
+    filter_stimuli:
+      name: QueryEvents
+      query: type != 'Image' or (label == 'stim_train' and subject not in ['Xu2025Alljoined/3',
+        'Xu2025Alljoined/8', 'Xu2025Alljoined/13', 'Xu2025Alljoined/18']) or (label
+        == 'stim_test' and subject in ['Xu2025Alljoined/3', 'Xu2025Alljoined/8', 'Xu2025Alljoined/13',
+        'Xu2025Alljoined/18'])
+    split:
+      name: PredefinedSplit
+      test_split_query: label == 'stim_test'
+      col_name: split
+      valid_split_by: timeline
+      valid_split_ratio: 0.2
+      valid_random_state: 33
+  summary_columns:
+  - filepath
+  neuro:
+    frequency: 200.0
+    filter:
+    - 0.1
+    - 55.0
+    notch_filter:
+    - 50.0
+    - 60.0
+    baseline:
+    - 0.0
+    - 0.2
+    scaler: RobustScaler
+    clamp: 20.0
+  target:
+    batch_size: 4
+  batch_size: 256
+loss.temperature: true
+loss.symmetric: true
+trainer_config.n_epochs: 6
+lightning_optimizer_config.optimizer.lr: 0.0003
+lightning_optimizer_config.scheduler.kwargs.max_lr: 0.0003

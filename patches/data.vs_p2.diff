@@ -1,0 +1,14 @@
+--- /path/to/home/miniconda3/envs/eeg2img_new/lib/python3.12/site-packages/neuralbench/data.py.bak_p2	2026-11-19 10:25:37.306281228 +0530
++++ /path/to/home/miniconda3/envs/eeg2img_new/lib/python3.12/site-packages/neuralbench/data.py	2026-11-19 10:25:37.314281377 +0530
+@@ -332,6 +332,11 @@
+             if split == "train" and self.sampler is not None:
+                 sampler = self.sampler.build(split_dataset, generator=sampler_gen)
+ 
++            import os as _os
++            if split == "train" and sampler is None and int(_os.environ.get("NB_GROUP", "0") or 0) > 1:
++                from neuralbench.p2 import build_group_sampler
++                sampler = build_group_sampler(split_dataset, int(_os.environ["NB_GROUP"]), sampler_gen)
++
+             persistent_workers = self.persistent_workers and self.num_workers > 0
+             loaders[split] = DataLoader(
+                 split_dataset,
